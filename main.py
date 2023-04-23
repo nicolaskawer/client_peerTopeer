@@ -1,35 +1,47 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-from threading import Thread
+import time
 import socket
-import sys
-server_addr = ('127.0.0.1', 9999)
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-my_name = input('Enter your name: ')
-sock.sendto(my_name.encode(), server_addr)
-def output_recvfrom(sock):
-    while True:
-        data, _ = sock.recvfrom(1024)
-        if not data: break
-        print(data.decode())
+import struct
+import threading
 
-x = Thread(target=output_recvfrom, args=(sock, ))
-x.start()
-for line in sys.stdin:
-    sock.sendto(line.strip().encode(), server_addr)
-sock.close()
-x.join()
+
+def convertData(messageType, subtype, data, pData=b''):
+    msg = struct.pack('>bbhh', messageType, subtype, len(data) + len(pData), len(pData))
+    return msg + pData + data
+
+
+def getData():
+    while True:
+        data = sock.recv(6)
+        msgtype, subtype, msglen, sublen = struct.unpack('>bbhh', data)
+        msg = sock.recv(msglen)
+
+        if msgtype == 3:
+            name1, msg = msg[0:sublen], msg[sublen:]
+            sender, receiver = name1.decode().split('\0')
+            if name == receiver:
+                print('Message from', sender, 'to', receiver, ':', msg.decode())
+        else:
+            print('Error', msgtype)
+
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
     print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    ip = input('Enter IP address: ')
+    port = int(input('Enter port number: '))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    sock.connect((ip, port))
+    name = input('Enter your user name:')
+    sock.send(convertData(messageType=2, subtype=1, data=name.encode()))
+    threading.Thread(target=getData).start()
+
+    while True:
+        rec = input('Enter message receiver: ').strip()
+        msg = input('Enter message: ').strip()
+        reply = convertData(messageType=3, subtype=0, data=msg.encode(), pData=rec.encode())
+        sock.send(reply)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
